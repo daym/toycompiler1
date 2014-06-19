@@ -27,7 +27,7 @@ $(NAME)_iburg.o: $(NAME)_iburg.c treenode.h regalloc.h
 	gcc -c -DUSE_IBURG -DBURM $(NAME)_iburg.c -g3 -Wall
 
 $(NAME)_iburg.c: $(NAME).bfe treenode.h regalloc.h
-	./bfe < $(NAME).bfe | iburg > $(NAME)_iburg.c.new && mv $(NAME)_iburg.c.new $(NAME)_iburg.c
+	./bfe < $(NAME).bfe | ../iburg-bison/iburg > $(NAME)_iburg.c.new && mv $(NAME)_iburg.c.new $(NAME)_iburg.c
 
 treenode.o: treenode.c treenode.h
 	gcc -c -DUSE_IBURG $< -o $@ -g3 -Wall

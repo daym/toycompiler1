@@ -4,6 +4,8 @@ LDFLAGS=-O2
 YFLAGS=
 OBJS=aburg.o gram.o
 
+all: iburg
+
 iburg:		aburg.o gram.o
 		$(CC) -o iburg $(LDFLAGS) $(OBJS)
 

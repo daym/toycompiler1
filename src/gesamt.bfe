@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <inttypes.h>
 
 #include "treenode.h"
 #include "regalloc.h"
@@ -30,7 +31,7 @@
 #define FREE_TEMP1 { if(kids[1] && !REG_EQ(kids[1]->regname, bnode->regname)) freeTempReg(kids[1]->regname); }
 #define MAYBE_MOVE(a,b) { if (!REG_EQ((a), (b))) printf("\tmovq %s, %s\n", (a), (b)); }
 
-//reg:    DEREF(const)          # 1 # ENSURE_DEST_REG printf("\tmovq ($%lu), %s\n", kids[0]->value, bnode->regname); FREE_TEMPS
+//reg:    DEREF(const)          # 1 # ENSURE_DEST_REG printf("\tmovq ($%"PRIu64"), %s\n", kids[0]->value, bnode->regname); FREE_TEMPS
 
 static int counter = 0;
 static char* getNewLabel(void) {
@@ -80,14 +81,14 @@ static void emit_call(uint64_t localVarCount, const char* target, treenode* args
 %%
 
 reg:	ASSIGN(reg,reg)     # 1 # bnode->regname = kids[0]->regname; printf("\tmovq %s, %s\n",kids[1]->regname, kids[0]->regname); FREE_TEMP1
-reg:	ASSIGN(reg,const)     # 1 # bnode->regname = kids[0]->regname; printf("\tmovq $%lu, %s\n",kids[1]->value,kids[0]->regname);
+reg:	ASSIGN(reg,const)     # 1 # bnode->regname = kids[0]->regname; printf("\tmovq $%"PRIu64", %s\n",kids[1]->value,kids[0]->regname);
 reg:    WDEREF(reg,reg)     # 2 # printf("\tmovq %s, (%s)\n", kids[1]->regname, kids[0]->regname); FREE_TEMP1 /* Note: much like assign */
-reg:    WDEREF(ADD(reg,const),reg) # 2 # printf("\tmovq %s, %lu(%s)\n", kids[2]->regname, kids[1]->value, kids[0]->regname); FREE_TEMP1 /* Note: much like assign */
+reg:    WDEREF(ADD(reg,const),reg) # 2 # printf("\tmovq %s, %"PRIu64"(%s)\n", kids[2]->regname, kids[1]->value, kids[0]->regname); FREE_TEMP1 /* Note: much like assign */
 reg:	ADDASSIGN(reg,reg)  # 1 # printf("\taddq %s, %s\n",kids[1]->regname,kids[0]->regname);
-reg:	ADDASSIGN(reg,const)  # 1 # printf("\taddq $%lu, %s\n",kids[1]->value,kids[0]->regname);
+reg:	ADDASSIGN(reg,const)  # 1 # printf("\taddq $%"PRIu64", %s\n",kids[1]->value,kids[0]->regname);
 reg:    ADD(reg,reg)        # 1 # ENSURE_DEST_REG MAYBE_MOVE(kids[1]->regname, bnode->regname); printf("\taddq %s, %s\n", kids[0]->regname, bnode->regname); FREE_TEMPS
-reg:    ADD(const,reg)        # 1 # ENSURE_DEST_REG MAYBE_MOVE(kids[1]->regname, bnode->regname); printf("\taddq $%lu, %s\n", kids[0]->value, bnode->regname); FREE_TEMPS
-reg:    ADD(reg,const)        # 1 # ENSURE_DEST_REG MAYBE_MOVE(kids[0]->regname, bnode->regname); printf("\taddq $%lu, %s\n", kids[1]->value, bnode->regname); FREE_TEMPS
+reg:    ADD(const,reg)        # 1 # ENSURE_DEST_REG MAYBE_MOVE(kids[1]->regname, bnode->regname); printf("\taddq $%"PRIu64", %s\n", kids[0]->value, bnode->regname); FREE_TEMPS
+reg:    ADD(reg,const)        # 1 # ENSURE_DEST_REG MAYBE_MOVE(kids[0]->regname, bnode->regname); printf("\taddq $%"PRIu64", %s\n", kids[1]->value, bnode->regname); FREE_TEMPS
 reg:    SUB(reg,reg)        # 1 # ENSURE_DEST_REG MAYBE_MOVE(kids[0]->regname, bnode->regname); printf("\tsubq %s, %s\n", kids[1]->regname, bnode->regname); FREE_TEMPS
 reg:    MUL(reg,reg)        # 1 # ENSURE_DEST_REG MAYBE_MOVE(kids[1]->regname, bnode->regname); printf("\timulq %s, %s\n", kids[0]->regname, bnode->regname); FREE_TEMPS
 reg:    OR(reg,reg)         # 1 # ENSURE_DEST_REG MAYBE_MOVE(kids[1]->regname, bnode->regname); printf("\torq %s, %s\n", kids[0]->regname, bnode->regname); FREE_TEMPS
@@ -104,11 +105,11 @@ const:    NOT(const)            # 0 # bnode->value = ~kids[0]->value;
 const:    NEG(const)            # 0 # bnode->value = -kids[0]->value;
 const:    GT(const,const)         # 0 # bnode->value = (kids[0]->value > kids[1]->value) ? ~0UL : 0UL;
 reg:    DEREF(reg)          # 2 # ENSURE_UDEST_REG printf("\tmovq (%s), %s\n", kids[0]->regname, bnode->regname); FREE_UTEMPS
-reg:    DEREF(const)          # 2 # ENSURE_LITDEST_REG printf("\tmovq %lu, %s\n\tmovq (%s), %s\n", kids[0]->value, bnode->regname, bnode->regname, bnode->regname);
-reg:    DEREF(ADD(reg,const)) # 2 # ENSURE_UDEST_REG printf("\tmovq %lu(%s), %s\n", kids[1]->value, kids[0]->regname, bnode->regname); FREE_UTEMPS
+reg:    DEREF(const)          # 2 # ENSURE_LITDEST_REG printf("\tmovq %"PRIu64", %s\n\tmovq (%s), %s\n", kids[0]->value, bnode->regname, bnode->regname, bnode->regname);
+reg:    DEREF(ADD(reg,const)) # 2 # ENSURE_UDEST_REG printf("\tmovq %"PRIu64"(%s), %s\n", kids[1]->value, kids[0]->regname, bnode->regname); FREE_UTEMPS
 reg:	REG		    # 0
 const:	NUM		    # 0
-reg:    const                 # 1 # ENSURE_LITDEST_REG printf("\tmovq $%lu, %s\n",kids[0]->value,bnode->regname);
+reg:    const                 # 1 # ENSURE_LITDEST_REG printf("\tmovq $%"PRIu64", %s\n",kids[0]->value,bnode->regname);
 reg:    RET(reg)            # 1 # bnode->regname = kids[0]->regname; printf("\tmovq %s, %%rax\n\tret\n", kids[0]->regname);
 reg:    SEQUENCE(reg,reg)   # 0 # bnode->regname = kids[1]->regname;
 reg:    SENTINEL            # 0 # bnode->regname = RAX;
