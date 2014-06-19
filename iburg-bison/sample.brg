@@ -1,0 +1,24 @@
+%{
+typedef struct tree {
+	int op;
+	struct tree *left, *right;
+	STATEPTR_TYPE state_label;
+} *treepointer;
+
+#define NODEPTR_TYPE treepointer
+#define OP_LABEL(p) ((p)->op)
+#define LEFT_CHILD(p) ((p)->left)
+#define RIGHT_CHILD(p) ((p)->right)
+#define STATE_LABEL(p) ((p)->state_label)
+#define PANIC printf
+%}
+%start reg
+%term Assign=1 Constant=2 Fetch=3 Four=4 Mul=5 Plus=6
+%%
+con:  Constant                = 1 (0);
+con:  Four                    = 2 (0);
+addr: con                     = 3 (0);
+addr: Plus(con,reg)           = 4 (0);
+addr: Plus(con,Mul(Four,reg)) = 5 (0);
+reg:  Fetch(addr)             = 6 (1);
+reg:  Assign(addr,reg)        = 7 (1);
