@@ -1,0 +1,5 @@
+struct s : z y x a end;
+func foo(a)
+  a.x = 3;
+  return a.x;
+end;

@@ -1,0 +1,4 @@
+struct s : z y x a end;
+func foo(a)
+  return 4.x;
+end;

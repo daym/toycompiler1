@@ -1,0 +1,29 @@
+.text
+.globl bar
+.type bar, @function
+bar:
+	movq $3, %r9
+	movq %r9, %rax
+	ret
+	movq $0, %r8
+	movq %r8, %rax
+	ret
+# end fn bar
+.globl foo
+.type foo, @function
+foo:
+	push %rdi
+	push %r9
+	push %rdi
+	pop %rdi
+	call bar
+	pop %r9
+	pop %rdi
+	movq %rax, %r9
+	addq $20, %r9
+	movq %r9, %rax
+	ret
+	movq $0, %r8
+	movq %r8, %rax
+	ret
+# end fn foo

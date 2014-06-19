@@ -1,0 +1,26 @@
+#!/bin/sh
+set -e
+for t in test/*
+do
+	echo "${t}"
+	if [ -s "${t}/error" ]
+	then
+		./gesamt < "${t}/input" >tmpOutput 2>tmpError || true
+		diff -u tmpOutput "${t}/output"
+		diff -u tmpError "${t}/error"
+	else
+		cat "${t}/input" | ./gesamt >tmpOutput 2>tmpError
+		diff -u tmpOutput "${t}/output"
+		if [ -f "${t}/error" ]
+		then
+			diff -u tmpError "${t}/error"
+		else
+			[ ! -s tmpError ]
+			gcc -o testmain testmain.c -x assembler tmpOutput 
+			./testmain || echo $?
+		fi
+	fi
+done
+rm -f tmpError tmpOutput
+echo OK
+

@@ -1,0 +1,5 @@
+struct s: t end;
+func f(t)
+  with 0:s do end;
+end;
+

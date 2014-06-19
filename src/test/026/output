@@ -1,0 +1,36 @@
+.text
+.globl foo
+.type foo, @function
+foo:
+	movq $0, %r9
+	cmpq %r9, %rdi
+	mov $0, %r9
+	jle L_1
+	not %r9
+L_1:
+	cmpq $0, %r9
+	jge L_2
+	movq $42, %r8
+	movq %r8, %rax
+	ret
+	jmp L_3
+L_2:
+	movq $0, %rcx
+	cmpq %rdi, %rcx
+	mov $0, %rdx
+	jle L_4
+	not %rdx
+L_4:
+	cmpq $0, %rdx
+	jge L_5
+	movq $81, %rcx
+	movq %rcx, %rax
+	ret
+	jmp L_6
+L_5:
+L_6:
+L_3:
+	movq $0, %rsi
+	movq %rsi, %rax
+	ret
+# end fn foo

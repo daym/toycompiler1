@@ -1,0 +1,6 @@
+func bar(x)
+  return 3;
+end;
+func foo(x)
+  return 20 + bar(50);
+end;

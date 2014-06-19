@@ -1,0 +1,9 @@
+func foo(x y)
+  let a = 3;
+      b = a + 1; in
+    b = 1;
+    return b * y;
+  end;
+end;
+ 
+

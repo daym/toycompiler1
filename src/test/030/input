@@ -1,0 +1,6 @@
+struct s: a b c end;
+struct t: d e f end;
+func foo(x)
+  x.b.f=7;
+  return x;
+end;

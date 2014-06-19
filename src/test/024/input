@@ -1,0 +1,7 @@
+struct s : z y x a end;
+func foo(a)
+  with a : s do
+    x = 3;
+  end;
+  return a.x; 
+end;

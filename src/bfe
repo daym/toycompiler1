@@ -1,0 +1,2 @@
+#!/bin/sh
+gawk -f ./bfe.awk $1

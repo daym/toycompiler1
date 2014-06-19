@@ -1,0 +1,13 @@
+.text
+.globl foo
+.type foo, @function
+foo:
+	movq %rdi, %r9
+	not %r9
+	not %r9
+	movq %r9, %rax
+	ret
+	movq $0, %r8
+	movq %r8, %rax
+	ret
+# end fn foo

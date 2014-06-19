@@ -1,0 +1,11 @@
+func foo(t)
+  cond 
+    t > 0 then 
+      return 42;
+    end; 
+    0 > t then 
+      return 81;
+    end;
+  end;
+end;
+

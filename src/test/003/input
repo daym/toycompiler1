@@ -1,0 +1,4 @@
+func foo(a)
+  return 2 + 4;
+  return 4;
+end;

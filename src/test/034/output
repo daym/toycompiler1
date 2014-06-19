@@ -1,0 +1,62 @@
+.text
+.globl fac
+.type fac, @function
+fac:
+	movq $0, %r9
+	subq %rdi, %r9
+	je L_1
+	xorq %r9,%r9
+	not %r9
+L_1:
+	cmpq $0, %r9
+	jge L_2
+	movq %rdi, %r8
+	addq $18446744073709551615, %r8
+	push %rdi
+	push %rcx
+	push %r8
+	push %r9
+	push %r8
+	pop %rdi
+	call fac
+	pop %r9
+	pop %r8
+	pop %rcx
+	pop %rdi
+	movq %rax, %rcx
+	imulq %rdi, %rcx
+	movq %rcx, %rax
+	ret
+	jmp L_3
+L_2:
+	movq $18446744073709551615, %rdx
+	cmpq $0, %rdx
+	jge L_4
+	movq $1, %rsi
+	movq %rsi, %rax
+	ret
+	jmp L_5
+L_4:
+L_5:
+L_3:
+	movq $0, %rdi
+	movq %rdi, %rax
+	ret
+# end fn fac
+.globl foo
+.type foo, @function
+foo:
+	push %rdi
+	push %r9
+	push %rdi
+	pop %rdi
+	call fac
+	pop %r9
+	pop %rdi
+	movq %rax, %r9
+	movq %r9, %rax
+	ret
+	movq $0, %r8
+	movq %r8, %rax
+	ret
+# end fn foo

@@ -1,0 +1,3 @@
+func foo(a)
+  return 4 * a;
+end;

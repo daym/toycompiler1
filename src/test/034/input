@@ -1,0 +1,9 @@
+func fac(x)
+  cond
+    (x <> 0) then return x*fac(x + (-1)); end;
+    (1 <> 0) then return 1; end;
+  end;
+end;
+func foo(x)
+  return fac(x);
+end;

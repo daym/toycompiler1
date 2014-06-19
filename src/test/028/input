@@ -1,0 +1,5 @@
+struct s: a b c end;
+struct t: d e f end;
+func foo(x)
+  return x.f;
+end;

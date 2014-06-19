@@ -1,0 +1,132 @@
+%{
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include "treenode.h"
+#include "regalloc.h"
+
+
+#define ENSURE_DEST_REG { if(bnode->regname == NULL) { \
+                             bnode->regname = (kids[1] != NULL && isTempReg(kids[1]->regname)) ? kids[1]->regname : allocTempReg(); \
+                          }\
+                        }
+#define ENSURE_UDEST_REG { if(bnode->regname == NULL) { \
+                             bnode->regname = (kids[0] != NULL && isTempReg(kids[0]->regname)) ? kids[0]->regname : allocTempReg(); \
+                          }\
+                        }
+#define ENSURE_LITDEST_REG { if(bnode->regname == NULL) \
+                              bnode->regname = allocTempReg(); \
+                           }
+
+/* temp regs are freed as soon as possible. This makes sure not to free temps that were passed in and reused for a new result. */
+
+#define FREE_UTEMPS { if(kids[0] && !REG_EQ(kids[0]->regname, bnode->regname)) freeTempReg(kids[0]->regname); }
+#define FREE_TEMPS { if(kids[0] && !REG_EQ(kids[0]->regname, bnode->regname)) freeTempReg(kids[0]->regname); \
+                      if(kids[1] && !REG_EQ(kids[1]->regname, bnode->regname)) freeTempReg(kids[1]->regname); }
+
+#define FREE_TEMP1 { if(kids[1] && !REG_EQ(kids[1]->regname, bnode->regname)) freeTempReg(kids[1]->regname); }
+#define MAYBE_MOVE(a,b) { if (!REG_EQ((a), (b))) printf("\tmovq %s, %s\n", (a), (b)); }
+
+//reg:    DEREF(const)          # 1 # ENSURE_DEST_REG printf("\tmovq ($%lu), %s\n", kids[0]->value, bnode->regname); FREE_TEMPS
+
+static int counter = 0;
+static char* getNewLabel(void) {
+	char* result = NULL;
+	++counter;
+	if(asprintf(&result, "L_%d", counter) == -1)
+		abort();
+	return result;
+}
+/* emits arg pop in reverse order */
+static void emit_arg_pop_rev(treenode* args, int regi) {
+	if(args == NULL || args->op == SENTINEL)
+		return;
+	emit_arg_pop_rev(args->kids[1], regi + 1);
+	reg_t regname = registerNByIndex(regi)->regname;
+	printf("\tpop %s\n", regname);
+}
+static void emit_call(uint64_t localVarCount, const char* target, treenode* args) {
+	uint64_t i;
+	treenode* arg;
+	for(i = 0; i < REG_COUNT; ++i) {
+		reg_t regname = registerNByIndex(i)->regname;
+		if(i < localVarCount || isTempReg(regname))
+			printf("\tpush %s\n", regname);
+	}
+	/* there could be overlap between the new args and the old expr "args" so this isn't straightforward. */
+	{
+		for(arg = args, i = 0; OP_LABEL(arg) != SENTINEL; arg = arg->kids[1], ++i) {
+			reg_t regname = arg->kids[0]->regname;
+			printf("\tpush %s\n", regname);
+		}
+		emit_arg_pop_rev(args, 0);
+	}
+	printf("\tcall %s\n", target);
+	for(i = REG_COUNT; i > 0; --i) {
+		reg_t regname = registerNByIndex(i - 1)->regname;
+		if(i - 1 < localVarCount || isTempReg(regname))
+			printf("\tpop %s\n", regname);
+	}
+}
+
+%}
+
+%start reg
+%term ADD=1 REG=2 NUM=3 ASSIGN=4 ADDASSIGN=5 NEQ=6 MUL=7 OR=8 NOT=9 SUB=10 DEREF=11 NEG=12 GT=13 WDEREF=14 THEN_ELSE=15 SEQUENCE=16 RET=17 SENTINEL=18 TEST_BOOL=19 CALL=20 LABEL=21 CALLARGS=22 CALLCFG=23
+
+%%
+
+reg:	ASSIGN(reg,reg)     # 1 # bnode->regname = kids[0]->regname; printf("\tmovq %s, %s\n",kids[1]->regname, kids[0]->regname); FREE_TEMP1
+reg:	ASSIGN(reg,const)     # 1 # bnode->regname = kids[0]->regname; printf("\tmovq $%lu, %s\n",kids[1]->value,kids[0]->regname);
+reg:    WDEREF(reg,reg)     # 2 # printf("\tmovq %s, (%s)\n", kids[1]->regname, kids[0]->regname); FREE_TEMP1 /* Note: much like assign */
+reg:    WDEREF(ADD(reg,const),reg) # 2 # printf("\tmovq %s, %lu(%s)\n", kids[2]->regname, kids[1]->value, kids[0]->regname); FREE_TEMP1 /* Note: much like assign */
+reg:	ADDASSIGN(reg,reg)  # 1 # printf("\taddq %s, %s\n",kids[1]->regname,kids[0]->regname);
+reg:	ADDASSIGN(reg,const)  # 1 # printf("\taddq $%lu, %s\n",kids[1]->value,kids[0]->regname);
+reg:    ADD(reg,reg)        # 1 # ENSURE_DEST_REG MAYBE_MOVE(kids[1]->regname, bnode->regname); printf("\taddq %s, %s\n", kids[0]->regname, bnode->regname); FREE_TEMPS
+reg:    ADD(const,reg)        # 1 # ENSURE_DEST_REG MAYBE_MOVE(kids[1]->regname, bnode->regname); printf("\taddq $%lu, %s\n", kids[0]->value, bnode->regname); FREE_TEMPS
+reg:    ADD(reg,const)        # 1 # ENSURE_DEST_REG MAYBE_MOVE(kids[0]->regname, bnode->regname); printf("\taddq $%lu, %s\n", kids[1]->value, bnode->regname); FREE_TEMPS
+reg:    SUB(reg,reg)        # 1 # ENSURE_DEST_REG MAYBE_MOVE(kids[0]->regname, bnode->regname); printf("\tsubq %s, %s\n", kids[1]->regname, bnode->regname); FREE_TEMPS
+reg:    MUL(reg,reg)        # 1 # ENSURE_DEST_REG MAYBE_MOVE(kids[1]->regname, bnode->regname); printf("\timulq %s, %s\n", kids[0]->regname, bnode->regname); FREE_TEMPS
+reg:    OR(reg,reg)         # 1 # ENSURE_DEST_REG MAYBE_MOVE(kids[1]->regname, bnode->regname); printf("\torq %s, %s\n", kids[0]->regname, bnode->regname); FREE_TEMPS
+reg:    NOT(reg)            # 1 # ENSURE_UDEST_REG MAYBE_MOVE(kids[0]->regname, bnode->regname); printf("\tnot %s\n", bnode->regname); FREE_UTEMPS
+reg:    NEG(reg)            # 1 # ENSURE_UDEST_REG MAYBE_MOVE(kids[0]->regname, bnode->regname); printf("\tneg %s\n", bnode->regname); FREE_UTEMPS
+reg:    NEQ(reg,reg)        # 1 # ENSURE_DEST_REG MAYBE_MOVE(kids[1]->regname, bnode->regname); printf("\tsubq %s, %s\n", kids[0]->regname, bnode->regname); {char* l = getNewLabel(); printf("\tje %s\n\txorq %s,%s\n\tnot %s\n%s:\n", l, bnode->regname, bnode->regname, bnode->regname, l);} FREE_TEMPS
+reg:    GT(reg,reg)         # 1 # ENSURE_DEST_REG printf("\tcmpq %s, %s\n", kids[1]->regname, kids[0]->regname); {char* l2 = getNewLabel(); printf("\tmov $0, %s\n\tjle %s\n\tnot %s\n%s:\n", bnode->regname, l2,  bnode->regname, l2);} FREE_TEMPS
+const:    NEQ(const,const)        # 0 # bnode->value = (kids[0]->value == kids[1]->value) ? 0 : ~0UL;
+const:	ADD(const,const)	    # 0 # bnode->value = kids[0]->value + kids[1]->value; 
+const:    MUL(const,const)        # 0 # bnode->value = kids[0]->value * kids[1]->value;
+const:    SUB(const,const)        # 0 # bnode->value = kids[0]->value + kids[1]->value;
+const:    OR(const,const)         # 0 # bnode->value = kids[0]->value | kids[1]->value;
+const:    NOT(const)            # 0 # bnode->value = ~kids[0]->value;
+const:    NEG(const)            # 0 # bnode->value = -kids[0]->value;
+const:    GT(const,const)         # 0 # bnode->value = (kids[0]->value > kids[1]->value) ? ~0UL : 0UL;
+reg:    DEREF(reg)          # 2 # ENSURE_UDEST_REG printf("\tmovq (%s), %s\n", kids[0]->regname, bnode->regname); FREE_UTEMPS
+reg:    DEREF(const)          # 2 # ENSURE_LITDEST_REG printf("\tmovq %lu, %s\n\tmovq (%s), %s\n", kids[0]->value, bnode->regname, bnode->regname, bnode->regname);
+reg:    DEREF(ADD(reg,const)) # 2 # ENSURE_UDEST_REG printf("\tmovq %lu(%s), %s\n", kids[1]->value, kids[0]->regname, bnode->regname); FREE_UTEMPS
+reg:	REG		    # 0
+const:	NUM		    # 0
+reg:    const                 # 1 # ENSURE_LITDEST_REG printf("\tmovq $%lu, %s\n",kids[0]->value,bnode->regname);
+reg:    RET(reg)            # 1 # bnode->regname = kids[0]->regname; printf("\tmovq %s, %%rax\n\tret\n", kids[0]->regname);
+reg:    SEQUENCE(reg,reg)   # 0 # bnode->regname = kids[1]->regname;
+reg:    SENTINEL            # 0 # bnode->regname = RAX;
+reg:    THEN_ELSE(reg,reg)  # 2 # $lazy$ {char* lnext = getNewLabel(); char* lend = getNewLabel(); printf("\tjge %s\n", lnext); burm_reduce(kids[0], nts[0]); printf("\tjmp %s\n%s:\n", lend, lnext); burm_reduce(kids[1], nts[1]); printf("%s:\n", lend); }
+reg:    TEST_BOOL(reg)      # 1 # printf("\tcmpq $0, %s\n", kids[0]->regname);
+reg:    CALL(const,CALLCFG(label, args))    # 3 # ENSURE_LITDEST_REG emit_call(kids[0]->value, kids[1]->label, kids[2]); MAYBE_MOVE(RAX, bnode->regname);
+label:  LABEL
+args:   SENTINEL            # 0 # 
+args:   CALLARGS(reg, args) # 0 # 
+
+%%
+				
+extern treenode *root;
+extern int yyparse(void);
+void burm_reduce(NODEPTR_TYPE bnode, int goalnt);
+
+void invoke_burm(NODEPTR_TYPE root) {
+	burm_label(root);
+	burm_reduce(root, 1);
+}
+
